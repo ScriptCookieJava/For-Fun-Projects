@@ -1,0 +1,437 @@
+// File: ScriptCookieJavaAcademy.java
+import javax.swing.*;
+import javax.swing.border.EmptyBorder;
+import java.awt.*;
+import java.awt.event.*;
+import java.io.*;
+import java.util.*;
+
+/**
+ * ScriptCookie Java Academy
+ * - Multiple courses and lessons
+ * - Type code for each lesson and "Check Code"
+ * - Save/Load XP progress to a simple file
+ * - Navigation and "Made by ScriptCookie" credit
+ *
+ * This is intended to be a stable, runnable starting point. You can add lessons
+ * by editing buildCourses() which returns List<Course>.
+ */
+public class ScriptCookieJavaAcademy {
+
+    private static final String SAVE_FILE = "scriptcookie_progress.dat";
+
+    private JFrame frame;
+    private CardLayout cards;
+    private JPanel rootPanel;
+
+    private java.util.List<Course> courses;
+    private int currentCourseIndex = 0;
+    private int currentLessonIndex = 0;
+
+    private JTextArea lessonTextArea;
+    private JTextArea codeInputArea;
+    private JLabel feedbackLabel;
+    private JLabel xpLabel;
+    private int xp = 0;
+
+    public ScriptCookieJavaAcademy() {
+        courses = buildCourses();
+
+        frame = new JFrame("ScriptCookie Java Academy");
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setSize(1000, 650);
+        frame.setLocationRelativeTo(null);
+
+        cards = new CardLayout();
+        rootPanel = new JPanel(cards);
+
+        rootPanel.add(buildMainMenuPanel(), "MENU");
+        rootPanel.add(buildLessonPanel(), "LESSON");
+        rootPanel.add(buildFinalTestPanel(), "FINAL");
+
+        frame.setContentPane(rootPanel);
+
+        loadProgress(); // load xp if exists
+        frame.setVisible(true);
+    }
+
+    // ---------- Main Menu ----------
+    private JPanel buildMainMenuPanel() {
+        JPanel panel = new JPanel(null);
+        panel.setBackground(new Color(44, 62, 80));
+
+        JLabel title = new JLabel("ScriptCookie Java Academy", SwingConstants.CENTER);
+        title.setBounds(0, 25, 1000, 50);
+        title.setFont(new Font("Consolas", Font.BOLD, 30));
+        title.setForeground(Color.WHITE);
+        panel.add(title);
+
+        JLabel credit = new JLabel("Made by ScriptCookie");
+        credit.setBounds(820, 10, 160, 20);
+        credit.setForeground(Color.WHITE);
+        panel.add(credit);
+
+        xpLabel = new JLabel("XP: " + xp);
+        xpLabel.setBounds(20, 10, 120, 20);
+        xpLabel.setForeground(Color.WHITE);
+        panel.add(xpLabel);
+
+        int startY = 120;
+        for (int i = 0; i < courses.size(); i++) {
+            Course c = courses.get(i);
+            JButton btn = new JButton(c.name);
+            btn.setBounds(300, startY + i * 70, 400, 50);
+            btn.setFont(new Font("Arial", Font.BOLD, 16));
+            final int courseIndex = i;
+            btn.addActionListener(e -> {
+                currentCourseIndex = courseIndex;
+                currentLessonIndex = 0;
+                showLesson(currentCourseIndex, currentLessonIndex);
+                cards.show(rootPanel, "LESSON");
+            });
+            panel.add(btn);
+        }
+
+        JButton finalBtn = new JButton("Final Test");
+        finalBtn.setBounds(300, startY + courses.size() * 70 + 20, 400, 50);
+        finalBtn.setFont(new Font("Arial", Font.BOLD, 16));
+        finalBtn.addActionListener(e -> cards.show(rootPanel, "FINAL"));
+        panel.add(finalBtn);
+
+        JButton saveBtn = new JButton("Save Progress");
+        saveBtn.setBounds(820, 550, 140, 40);
+        saveBtn.addActionListener(e -> {
+            saveProgress();
+            JOptionPane.showMessageDialog(frame, "Progress saved.");
+        });
+        panel.add(saveBtn);
+
+        return panel;
+    }
+
+    // ---------- Lesson Panel ----------
+    private JPanel buildLessonPanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(new EmptyBorder(10,10,10,10));
+
+        // Top: lesson info
+        lessonTextArea = new JTextArea();
+        lessonTextArea.setEditable(false);
+        lessonTextArea.setFont(new Font("Monospaced", Font.PLAIN, 14));
+        lessonTextArea.setLineWrap(true);
+        lessonTextArea.setWrapStyleWord(true);
+        lessonTextArea.setBackground(new Color(245, 245, 245));
+        lessonTextArea.setBorder(BorderFactory.createTitledBorder("Lesson"));
+        lessonTextArea.setRows(10);
+        panel.add(new JScrollPane(lessonTextArea), BorderLayout.NORTH);
+
+        // Center: code input
+        codeInputArea = new JTextArea();
+        codeInputArea.setFont(new Font("Monospaced", Font.PLAIN, 14));
+        codeInputArea.setLineWrap(true);
+        codeInputArea.setWrapStyleWord(true);
+        codeInputArea.setBorder(BorderFactory.createTitledBorder("Type the code exactly as requested"));
+        panel.add(new JScrollPane(codeInputArea), BorderLayout.CENTER);
+
+        // Bottom: controls
+        JPanel bottom = new JPanel();
+        bottom.setLayout(new FlowLayout(FlowLayout.CENTER, 10, 10));
+        JButton prevBtn = new JButton("Previous");
+        JButton nextBtn = new JButton("Next");
+        JButton checkBtn = new JButton("Check Code");
+        JButton hintBtn = new JButton("Show Hint");
+        JButton menuBtn = new JButton("Main Menu");
+        feedbackLabel = new JLabel(" ");
+        feedbackLabel.setPreferredSize(new Dimension(400, 24));
+
+        prevBtn.addActionListener(e -> {
+            if (currentLessonIndex > 0) currentLessonIndex--;
+            showLesson(currentCourseIndex, currentLessonIndex);
+        });
+        nextBtn.addActionListener(e -> {
+            Course course = courses.get(currentCourseIndex);
+            if (currentLessonIndex < course.lessons.size() - 1) currentLessonIndex++;
+            showLesson(currentCourseIndex, currentLessonIndex);
+        });
+        checkBtn.addActionListener(e -> checkCode());
+        hintBtn.addActionListener(e -> showHint());
+        menuBtn.addActionListener(e -> cards.show(rootPanel, "MENU"));
+
+        bottom.add(prevBtn);
+        bottom.add(nextBtn);
+        bottom.add(checkBtn);
+        bottom.add(hintBtn);
+        bottom.add(menuBtn);
+        bottom.add(feedbackLabel);
+
+        panel.add(bottom, BorderLayout.SOUTH);
+
+        return panel;
+    }
+
+    private void showLesson(int courseIndex, int lessonIndex) {
+        Course course = courses.get(courseIndex);
+        Lesson lesson = course.lessons.get(lessonIndex);
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("Course: ").append(course.name).append("\n");
+        sb.append("Lesson ").append(lessonIndex + 1).append(" - ").append(lesson.title).append("\n\n");
+        sb.append("Description:\n").append(lesson.description).append("\n\n");
+        sb.append("Deep Dive:\n").append(lesson.deepDive).append("\n\n");
+        sb.append("Task (type exactly):\n").append(lesson.task).append("\n\n");
+        sb.append("Expected code example:\n").append(lesson.expectedCode).append("\n");
+
+        lessonTextArea.setText(sb.toString());
+        codeInputArea.setText(""); // clear for user to type
+        feedbackLabel.setText(" ");
+    }
+
+    private void checkCode() {
+        Course course = courses.get(currentCourseIndex);
+        Lesson lesson = course.lessons.get(currentLessonIndex);
+
+        String typed = codeInputArea.getText().trim();
+        String expected = lesson.expectedCode.trim();
+
+        if (typed.equals(expected)) {
+            feedbackLabel.setText("✅ Correct! +10 XP");
+            xp += 10;
+            xpLabel.setText("XP: " + xp);
+        } else {
+            // partial check: check first token word
+            String[] expTokens = expected.split("\\s+");
+            if (expTokens.length > 0 && typed.contains(expTokens[0])) {
+                feedbackLabel.setText("⚠️ Close — you used the right start. Check syntax/spelling.");
+            } else {
+                feedbackLabel.setText("❌ Incorrect. Try again or press 'Show Hint'.");
+            }
+        }
+    }
+
+    private void showHint() {
+        Course course = courses.get(currentCourseIndex);
+        Lesson lesson = course.lessons.get(currentLessonIndex);
+        String hint = lesson.hint;
+        if (hint == null || hint.isEmpty()) hint = "No hint available for this lesson.";
+        JOptionPane.showMessageDialog(frame, hint, "Hint", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    // ---------- Final Test ----------
+    private JPanel buildFinalTestPanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(new EmptyBorder(10,10,10,10));
+
+        JTextArea testDesc = new JTextArea();
+        testDesc.setEditable(false);
+        testDesc.setFont(new Font("Monospaced", Font.PLAIN, 14));
+        testDesc.setText(
+                "FINAL TEST — ScriptCookie Java Academy\n\n" +
+                "Tasks (type answers in the box below):\n" +
+                "1) Create class Car with fields brand (String) and speed (int).\n" +
+                "2) Add a constructor for Car and a method accelerate that increases speed.\n" +
+                "3) Create a for loop that prints numbers 1 to 5.\n" +
+                "4) Write a method add(int a, int b) that returns a+b.\n\n" +
+                "Type all code in the box and press Submit. This final test is checked manually (for now)."
+        );
+        panel.add(new JScrollPane(testDesc), BorderLayout.NORTH);
+
+        JTextArea answerArea = new JTextArea();
+        answerArea.setFont(new Font("Monospaced", Font.PLAIN, 14));
+        panel.add(new JScrollPane(answerArea), BorderLayout.CENTER);
+
+        JPanel bottom = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 10));
+        JButton submit = new JButton("Submit Test");
+        JButton menuBtn = new JButton("Main Menu");
+
+        submit.addActionListener(e -> {
+            // For now just accept submission and reward XP for effort
+            JOptionPane.showMessageDialog(frame, "Test submitted! You earned +50 XP for submission (manual review recommended).");
+            xp += 50;
+            xpLabel.setText("XP: " + xp);
+            saveProgress();
+        });
+        menuBtn.addActionListener(e -> cards.show(rootPanel, "MENU"));
+
+        bottom.add(submit);
+        bottom.add(menuBtn);
+        panel.add(bottom, BorderLayout.SOUTH);
+
+        return panel;
+    }
+
+    // ---------- Data & Persistence ----------
+    private java.util.List<Course> buildCourses() {
+        java.util.List<Course> list = new ArrayList<>();
+
+        // Course: Java Basics
+        java.util.List<Lesson> basics = new ArrayList<>();
+        basics.add(new Lesson(
+                "Variables",
+                "Declare variables of primitive types and Strings.",
+                "int x = 5;",
+                "Variables let you store data. 'int' stores integers, 'double' decimals, 'String' text.",
+                "int x = 5;",
+                "Make sure to include the semicolon ';' at the end."
+        ));
+        basics.add(new Lesson(
+                "If / Else",
+                "Make decisions using if and else.",
+                "if(x > 0) { System.out.println(\"positive\"); }",
+                "Conditions evaluate to true/false. Use ==, >, <, >=, <= for comparisons.",
+                "if(x > 0) { System.out.println(\"positive\"); }",
+                "Remember curly braces {} and double quotes for strings."
+        ));
+        basics.add(new Lesson(
+                "For Loop",
+                "Repeat code with a for loop.",
+                "for(int i = 0; i < 5; i++) { System.out.println(i); }",
+                "for(initial; condition; step) { body }",
+                "for(int i = 0; i < 5; i++) { System.out.println(i); }",
+                "common mistake: off-by-one on the loop condition."
+        ));
+        basics.add(new Lesson(
+                "Methods",
+                "Define reusable functions (methods).",
+                "int add(int a, int b) { return a + b; }",
+                "Methods have return type, name, parameters, and body.",
+                "int add(int a, int b) { return a + b; }",
+                "Make sure types match (return type and parameter types)."
+        ));
+        basics.add(new Lesson(
+                "Arrays",
+                "Store multiple values in an array.",
+                "int[] arr = {1, 2, 3};",
+                "Arrays hold fixed-size sequences of values.",
+                "int[] arr = {1, 2, 3};",
+                "Use {} to initialize arrays inline."
+        ));
+        list.add(new Course("Java Basics", basics));
+
+        // Course: Intermediate Java
+        java.util.List<Lesson> inter = new ArrayList<>();
+        inter.add(new Lesson(
+                "Classes",
+                "Create blueprints for objects.",
+                "class Dog { String name; }",
+                "Classes define fields and methods for objects.",
+                "class Dog { String name; }",
+                "Start with 'class' keyword and curly braces."
+        ));
+        inter.add(new Lesson(
+                "Objects",
+                "Instantiate classes to create objects.",
+                "Dog d = new Dog();",
+                "Use 'new' to create objects and call constructors.",
+                "Dog d = new Dog();",
+                "Don't forget parentheses after constructor."
+        ));
+        inter.add(new Lesson(
+                "Inheritance",
+                "Extend classes to reuse code.",
+                "class Puppy extends Dog { }",
+                "Use 'extends' to inherit fields/methods from parent class.",
+                "class Puppy extends Dog { }",
+                "Remember Puppy inherits Dog's members."
+        ));
+        inter.add(new Lesson(
+                "Polymorphism",
+                "Use a parent type to hold child objects.",
+                "Animal a = new Dog();",
+                "Polymorphism lets you treat subclasses as their superclass type.",
+                "Animal a = new Dog();",
+                "Useful for writing flexible code."
+        ));
+        list.add(new Course("Intermediate Java", inter));
+
+        // Course: Mini Projects
+        java.util.List<Lesson> proj = new ArrayList<>();
+        proj.add(new Lesson(
+                "Simple Calculator",
+                "Add two numbers from variables.",
+                "int sum = a + b;",
+                "Use + for addition. Store result in variable.",
+                "int sum = a + b;",
+                "Make sure 'a' and 'b' are defined."
+        ));
+        proj.add(new Lesson(
+                "Guess Game Check",
+                "Check if guess equals number.",
+                "if(guess == number) { System.out.println(\"Correct\"); }",
+                "Use == to compare primitive values.",
+                "if(guess == number) { System.out.println(\"Correct\"); }",
+                "Don't use '=' (assignment) when comparing."
+        ));
+        list.add(new Course("Mini Projects", proj));
+
+        // Course: Graphics / 3D Concepts (theoretical)
+        java.util.List<Lesson> gfx = new ArrayList<>();
+        gfx.add(new Lesson(
+                "Rotating Cube (concept)",
+                "Basic idea: rotate cube vertices and project to 2D.",
+                "cube.rotateX(30); cube.rotateY(45);",
+                "Rotation uses matrices; apply rotation then projection.",
+                "cube.rotateX(30); cube.rotateY(45);",
+                "This is conceptual; real implementation uses math for rotation."
+        ));
+        list.add(new Course("Graphics & 3D", gfx));
+
+        return list;
+    }
+
+    private void saveProgress() {
+        try (PrintWriter out = new PrintWriter(new FileWriter(SAVE_FILE))) {
+            out.println(xp);
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(frame, "Failed to save progress: " + e.getMessage(), "Save Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void loadProgress() {
+        File f = new File(SAVE_FILE);
+        if (!f.exists()) return;
+        try (Scanner sc = new Scanner(f)) {
+            if (sc.hasNextInt()) {
+                xp = sc.nextInt();
+            }
+        } catch (Exception e) {
+            // ignore and start with xp=0
+            xp = 0;
+        }
+    }
+
+    // ---------- Helper classes ----------
+    private static class Course {
+        String name;
+        java.util.List<Lesson> lessons;
+        Course(String name, java.util.List<Lesson> lessons) {
+            this.name = name;
+            this.lessons = lessons;
+        }
+    }
+
+    private static class Lesson {
+        String title;
+        String description;
+        String expectedCode; // exact expected code string
+        String deepDive;
+        String task; // what to type
+        String hint;
+
+        Lesson(String title, String description, String expectedCode, String deepDive, String task) {
+            this(title, description, expectedCode, deepDive, task, "");
+        }
+        Lesson(String title, String description, String expectedCode, String deepDive, String task, String hint) {
+            this.title = title;
+            this.description = description;
+            this.expectedCode = expectedCode;
+            this.deepDive = deepDive;
+            this.task = task;
+            this.hint = hint;
+        }
+    }
+
+    // ---------- Main ----------
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> new ScriptCookieJavaAcademy());
+    }
+}
