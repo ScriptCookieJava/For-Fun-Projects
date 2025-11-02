@@ -1,0 +1,81 @@
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+
+public class main extends JPanel implements ActionListener {
+
+    private Timer timer;
+    private double angleX = 0;
+    private double angleY = 0;
+
+    // Cube vertices
+    private double[][] vertices = {
+            {-50, -50, -50},
+            {50, -50, -50},
+            {50, 50, -50},
+            {-50, 50, -50},
+            {-50, -50, 50},
+            {50, -50, 50},
+            {50, 50, 50},
+            {-50, 50, 50}
+    };
+
+    // Cube edges
+    private int[][] edges = {
+            {0,1},{1,2},{2,3},{3,0},
+            {4,5},{5,6},{6,7},{7,4},
+            {0,4},{1,5},{2,6},{3,7}
+    };
+
+    public main() {
+        timer = new Timer(20, this);
+        timer.start();
+    }
+
+    @Override
+    public void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        Graphics2D g2d = (Graphics2D) g;
+        g2d.translate(getWidth()/2, getHeight()/2);
+
+        // Draw cube edges
+        for (int[] edge : edges) {
+            int[] p1 = project(vertices[edge[0]]);
+            int[] p2 = project(vertices[edge[1]]);
+            g2d.drawLine(p1[0], p1[1], p2[0], p2[1]);
+        }
+    }
+
+    private int[] project(double[] vertex) {
+        // Rotate around X axis
+        double y = vertex[1] * Math.cos(angleX) - vertex[2] * Math.sin(angleX);
+        double z = vertex[1] * Math.sin(angleX) + vertex[2] * Math.cos(angleX);
+
+        // Rotate around Y axis
+        double x = vertex[0] * Math.cos(angleY) + z * Math.sin(angleY);
+        z = -vertex[0] * Math.sin(angleY) + z * Math.cos(angleY);
+
+        // Perspective projection
+        double scale = 400 / (400 + z);
+        int px = (int) (x * scale);
+        int py = (int) (y * scale);
+        return new int[]{px, py};
+    }
+
+    @Override
+    public void actionPerformed(ActionEvent e) {
+        angleX += 0.02;
+        angleY += 0.03;
+        repaint();
+    }
+
+    public static void main(String[] args) {
+        JFrame frame = new JFrame("Rotating Cube");
+        main cube = new main();
+        frame.add(cube);
+        frame.setSize(600, 600);
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setLocationRelativeTo(null);
+        frame.setVisible(true);
+    }
+}
